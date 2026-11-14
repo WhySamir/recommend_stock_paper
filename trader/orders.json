@@ -1,0 +1,90 @@
+[
+  {
+    "plan": {
+      "symbol": "CREST",
+      "setup": "breakout",
+      "signal_date": "2026-11-06",
+      "entry": 1192.0,
+      "stop": 1104.5,
+      "target": 1410.75,
+      "risk_per_share": 87.5,
+      "reward_per_share": 218.75,
+      "reward_risk": 2.5,
+      "stop_basis": "range midpoint",
+      "setup_low": 1017.0,
+      "atr": 58.11,
+      "band_upper": 1201.63,
+      "max_hold_days": 10,
+      "entry_basis": "signal close",
+      "note": "target is 18.4% above entry: needs more than one session (band top today 1201.63)",
+      "volume_ratio": 3.83,
+      "setups": [
+        "breakout",
+        "bounce"
+      ]
+    },
+    "size": {
+      "feasible": true,
+      "shares": 30,
+      "lots": 3,
+      "position_cost": 35760.0,
+      "cash_used": 35919.1,
+      "buy_fees": 159.1,
+      "gross_loss_at_stop": 2625.0,
+      "net_loss_at_stop": 2933.36,
+      "net_reward_at_target": 6219.69,
+      "net_reward_risk": 2.12,
+      "reason": ""
+    },
+    "risk": {
+      "verdict": "PASS",
+      "checks": [
+        {
+          "rule": "position exists",
+          "ok": true,
+          "detail": "30 shares in 3 lots"
+        },
+        {
+          "rule": "loss at stop within per-trade limit",
+          "ok": true,
+          "detail": "Rs 2933.36 vs limit Rs 3000.0 (incl. charges)"
+        },
+        {
+          "rule": "loss at stop within daily limit",
+          "ok": true,
+          "detail": "Rs 2933.36 vs Rs 6000.0"
+        },
+        {
+          "rule": "cash covers position",
+          "ok": true,
+          "detail": "Rs 35919.1 of Rs 200000.0"
+        },
+        {
+          "rule": "reward:risk after charges",
+          "ok": true,
+          "detail": "2.12R vs 1.50R minimum"
+        },
+        {
+          "rule": "whole board lots",
+          "ok": true,
+          "detail": "lot size 10"
+        },
+        {
+          "rule": "entry inside the daily price band",
+          "ok": true,
+          "detail": "entry Rs 1192.0, band top Rs 1201.63"
+        },
+        {
+          "rule": "hold within settlement reality",
+          "ok": true,
+          "detail": "hold up to 10 sessions: NEPSE settles T+2 and sells only from demat"
+        },
+        {
+          "rule": "long only",
+          "ok": true,
+          "detail": "NEPSE has no short selling; this is a delivery long"
+        }
+      ]
+    }
+  }
+]

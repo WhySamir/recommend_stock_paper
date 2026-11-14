@@ -1,0 +1,48 @@
+{
+  "timezone": "Asia/Kathmandu",
+  "universe": ["NABIL", "NICA", "NLIC"],
+  "session": { "preopen": "10:30", "open": "11:00", "close": "15:00" },
+  "market": {
+    "lot_size": 10,
+    "price_band_pct": 15.0,
+    "preopen_band_pct": 5.0,
+    "settlement_days": 2,
+    "short_selling": false,
+    "intraday": false
+  },
+  "account": {
+    "cash": 200000.0,
+    "max_loss_per_trade": 3000.0,
+    "max_loss_per_day": 6000.0,
+    "max_trades_per_day": 2,
+    "min_reward_risk": 1.5
+  },
+  "charges": { "broker_pct": 0.36, "sebon_pct": 0.015, "dp_charge": 25.0 },
+  "scan": {
+    "breakout_lookback": 20,
+    "volume_lookback": 20,
+    "min_volume_ratio": 1.2,
+    "flag_bars": 3,
+    "flag_max_range_atr": 1.4,
+    "flag_min_prior_move_pct": 3.0,
+    "bounce_rsi": 15.0
+  },
+  "plan": { "target_r": 2.5, "atr_mult": 2.0, "max_hold_days": 10 },
+  "timemachine": { "iterations": 10000, "seed": 19, "lookback": 250 },
+  "data": {
+    "kind": "nepse",
+    "dir": "data",
+    "cache_dir": "data/cache",
+    "cache_ttl_minutes": 60,
+    "official": {
+      "base_url": "https://www.nepalstock.com.np",
+      "history_days": 400,
+      "security_map_ttl_hours": 24,
+      "token_ttl_seconds": 35,
+      "min_interval": 0.25,
+      "timeout": 30,
+      "verify_tls": true
+    }
+  },
+  "state_dir": "trader"
+}
