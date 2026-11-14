@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from . import store
+
 KINDS = ("above", "below", "stop", "target", "max_hold")
 
 
@@ -13,6 +15,8 @@ def path_for(cfg):
 
 
 def load(path):
+    if store.backend() == "postgres":
+        return store.load_alerts()
     path = Path(path)
     if not path.exists():
         return []
@@ -20,6 +24,9 @@ def load(path):
 
 
 def save(path, alerts):
+    if store.backend() == "postgres":
+        store.save_alerts(alerts)
+        return
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(alerts, indent=2) + "\n", encoding="utf-8")

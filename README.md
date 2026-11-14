@@ -299,6 +299,32 @@ have already been fetched, the newest bar appears only after a command runs
 close, and none of the analysis (plan / sizing / risk / Time Machine) is in the
 CSV. Serve the directory for charts and history; use the API for verdicts.
 
+## Neon Postgres state
+
+The engine's state can live in Neon Postgres instead of the JSON files in
+`trader/`. Set `NEON_CONN_URL` and the CLI and API write there; with the
+variable unset they keep using the files, so offline CSV runs and the test
+suite need no database.
+
+```bash
+pip install -r requirements.txt          # psycopg, the only dependency
+export NEON_CONN_URL='postgresql://...'  # never commit this value
+python -m nepse_trader.migrate --config config.json   # schema + import old state
+python -m nepse_trader.db --check                     # connectivity + tables
+python -m nepse_trader.db --smoke                     # CRUD end to end
+```
+
+`migrations/*.sql` are applied once each and tracked in `schema_migrations`.
+The imported files are `trader/scan.json`, `plans.json`, `orders.json`,
+`timemachine.json` (as `state_snapshots`), `trader/alerts.json` (`alerts`) and
+`trader/simulations/*/result.json` (`simulations`). The import is idempotent:
+existing rows are never overwritten.
+
+Connection handling: one short-lived psycopg connection per operation with
+`prepare_threshold=None`, which suits Neon's pooled endpoint behind a threaded
+server. `NEON_CONN_URL` is read from the environment only; the migrate command
+may also read `.env` / `.env.local` in the project root.
+
 ## Tests
 
 ```bash

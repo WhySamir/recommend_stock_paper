@@ -12,6 +12,7 @@ from . import config as config_mod
 from . import data as data_mod
 from . import plan as plan_mod
 from . import scan as scan_mod
+from . import store
 from . import timemachine as tm_mod
 
 
@@ -26,10 +27,15 @@ def _state(cfg, name):
 
 
 def _write(path, payload):
+    if store.backend() == "postgres":
+        store.write_state(Path(path).stem, payload)
+        return
     Path(path).write_text(json.dumps(payload, indent=2) + "\n", encoding="utf-8")
 
 
 def _read(path):
+    if store.backend() == "postgres":
+        return store.read_state(Path(path).stem)
     path = Path(path)
     if not path.exists():
         return None
