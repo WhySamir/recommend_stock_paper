@@ -129,3 +129,37 @@ def list_simulations():
 
 def delete_simulation(simulation_id):
     return db.execute("delete from simulations where id = %s", (simulation_id,))
+
+
+# -- paper positions --------------------------------------------------
+
+
+def load_positions():
+    rows = db.fetch_all(
+        "select symbol, quantity, avg_price, realized_pnl from positions"
+        " order by symbol"
+    )
+    return [
+        {
+            "symbol": row[0],
+            "quantity": row[1],
+            "avg_price": row[2],
+            "realized_pnl": row[3],
+        }
+        for row in rows
+    ]
+
+
+def save_position(symbol, quantity, avg_price, realized_pnl=0.0):
+    db.execute(
+        "insert into positions (symbol, quantity, avg_price, realized_pnl, updated_at)"
+        " values (%s, %s, %s, %s, now())"
+        " on conflict (symbol) do update set quantity = excluded.quantity,"
+        " avg_price = excluded.avg_price, realized_pnl = excluded.realized_pnl,"
+        " updated_at = now()",
+        (symbol.upper(), int(quantity), float(avg_price), float(realized_pnl)),
+    )
+
+
+def delete_position(symbol):
+    return db.execute("delete from positions where symbol = %s", (symbol.upper(),))

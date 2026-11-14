@@ -30,6 +30,48 @@ def atr_last(bars, period=14):
     return atr
 
 
+def ema_series(values, period):
+    """Exponential moving average, seeded with the first value."""
+    if period <= 0 or not values:
+        return []
+    k = 2.0 / (period + 1)
+    out = []
+    previous = None
+    for value in values:
+        previous = value if previous is None else value * k + previous * (1 - k)
+        out.append(previous)
+    return out
+
+
+def ema_last(values, period):
+    series = ema_series(values, period)
+    return series[-1] if len(series) >= period else None
+
+
+def macd_last(closes, fast=12, slow=26, signal=9):
+    """MACD line, signal line and histogram for the latest close."""
+    if len(closes) < slow + signal:
+        return None
+    fast_series = ema_series(closes, fast)
+    slow_series = ema_series(closes, slow)
+    line = [f - s for f, s in zip(fast_series, slow_series)]
+    signal_series = ema_series(line, signal)
+    return {
+        "macd": line[-1],
+        "signal": signal_series[-1],
+        "histogram": line[-1] - signal_series[-1],
+    }
+
+
+def stdev_last(values, period):
+    """Population standard deviation of the last ``period`` values."""
+    if period <= 0 or len(values) < period:
+        return None
+    window = values[-period:]
+    mean = sum(window) / period
+    return (sum((v - mean) ** 2 for v in window) / period) ** 0.5
+
+
 def rsi_last(closes, period=14):
     """Wilder's RSI over the available history."""
     if len(closes) < period + 1:
