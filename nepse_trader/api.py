@@ -29,6 +29,7 @@ from . import indicators as ind
 from . import plan as plan_mod
 from . import scan as scan_mod
 from . import simulation as simulation_mod
+from . import store
 from . import timemachine as tm_mod
 
 MAX_ITERATIONS = 50000
@@ -326,6 +327,9 @@ class App:
         payload = dict(result)
         payload["id"] = simulation_id
         payload["cache_dir"] = self.cfg["data"].get("cache_dir") or ""
+        if store.backend() == "postgres":
+            payload["simulation_dir"] = ""
+            return store.save_simulation(payload)
         payload["simulation_dir"] = str(self._simulation_dir() / simulation_id)
         folder = self._simulation_dir() / simulation_id
         folder.mkdir(parents=True, exist_ok=False)
@@ -335,12 +339,19 @@ class App:
     def get_simulation(self, simulation_id):
         if not re.fullmatch(r"[A-Za-z0-9T_-]{1,80}", simulation_id):
             raise ApiError("bad simulation id", 400)
+        if store.backend() == "postgres":
+            payload = store.get_simulation(simulation_id)
+            if payload is None:
+                raise ApiError("simulation not found", 404)
+            return payload
         path = self._simulation_dir() / simulation_id / "result.json"
         if not path.is_file():
             raise ApiError("simulation not found", 404)
         return json.loads(path.read_text(encoding="utf-8"))
 
     def simulations(self):
+        if store.backend() == "postgres":
+            return {"simulations": store.list_simulations(), "directory": ""}
         rows = []
         for path in sorted(self._simulation_dir().glob("*/result.json"), reverse=True):
             try:

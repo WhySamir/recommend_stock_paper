@@ -1,0 +1,3 @@
+# Neon Postgres driver. The engine itself stays standard-library only; this is
+# the one third-party package, used by nepse_trader.db / store / migrate.
+psycopg[binary]>=3.2
