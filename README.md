@@ -353,9 +353,9 @@ curl -sS -X DELETE http://127.0.0.1:8000/api/watchlist/NTC
 * `symbols` is optional; without it (or with `[]`) the saved watchlist is used.
 * Send `Idempotency-Key: <unique>` on a cron retry: the same key returns the
 existing run (`200`) instead of generating and notifying again.
-* `notify` is accepted now; Discord delivery is wired in phase 4. The response
-always carries `run_id`, the suggestions, their `market` / `portfolio` context,
-and a `notification` summary (`skipped` until then).
+* `notify: true` posts the run to Discord (see below); the response always
+carries `run_id`, the suggestions, their `market` / `portfolio` context, and a
+`notification` summary (`sent`, `skipped` or `error`).
 * Only `POST /api/suggestions` is behind `CRON_SECRET`; `GET
 /api/suggestions/latest` and the watchlist routes are read/write public JSON
 like the rest of the API.
@@ -408,6 +408,48 @@ Vercel cron (only if this API is deployed to Vercel; Vercel sends
 ```json
 { "crons": [{ "path": "/api/suggestions", "schedule": "15 9 * * 1-5" }] }
 ```
+
+### Discord notifications
+
+Set `DISCORD_WEBHOOK_URL` in the API server's environment (never in a file that
+gets committed) and call the endpoint with `"notify": true`. The message is one
+summary embed (run time, symbol count, BUY/SELL/HOLD counts) followed by one
+embed per suggestion with price, quantity, confidence and a short reason —
+green BUY, red SELL, grey HOLD — and a paper-trading/"not financial advice"
+footer.
+
+Create the webhook in Discord: **Server Settings → Integrations → Webhooks →
+New Webhook**, pick the channel, **Copy Webhook URL**. Treat the URL as a
+password: anyone holding it can post to that channel.
+
+Delivery rules:
+
+* At most 10 embeds and 6000 characters of embed content per message; longer
+  runs are chunked into `1/3`, `2/3`, … messages (2000 characters of content,
+  4096 per embed description).
+* HTTP 429 uses Discord's `retry_after`; 5xx and network errors back off
+  exponentially, up to 4 attempts per message.
+* Every attempt is recorded in `notification_log` (`sent`, `skipped`, `error`).
+  The API response is unaffected by a Discord failure — the run still returns
+  `201` with the suggestions, and `notification.status` says what happened.
+* A run that already has a `sent` row for the channel is never sent again, so a
+  retried cron call cannot double-post.
+
+Test it without the API (it prints the payloads and sends nothing):
+
+```bash
+python -m nepse_trader.discord --dry-run
+```
+
+Send a sample message with the real webhook:
+
+```bash
+python -m nepse_trader.discord --test
+```
+
+The sample includes a BUY, a SELL and a HOLD so all three colours and the
+footer show up. `--test` loads `.env` / `.env.local` if the variable is not
+already in the environment.
 
 ## Tests
 
