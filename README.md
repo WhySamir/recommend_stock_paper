@@ -325,6 +325,90 @@ Connection handling: one short-lived psycopg connection per operation with
 server. `NEON_CONN_URL` is read from the environment only; the migrate command
 may also read `.env` / `.env.local` in the project root.
 
+## Suggestion runs (BUY / SELL / HOLD)
+
+`nepse_trader/suggestions.py` scores daily bars (SMA/EMA trend, MACD, RSI
+extremes, volatility-adjusted momentum), replays the same score over each
+symbol's past window with the Time Machine and scales confidence by the
+realised win rate, expectancy and drawdown, then sizes every BUY from the paper
+portfolio (risk per trade, concentration cap, whole board lots) and caps every
+SELL at the shares held. One bad symbol never fails the batch.
+
+Runs, suggestions, the watchlist and the notification log live in Neon, so the
+endpoint needs `NEON_CONN_URL`. The cron endpoint also needs `CRON_SECRET`:
+
+```bash
+curl -sS -X POST http://127.0.0.1:8000/api/suggestions \
+  -H "Authorization: Bearer $CRON_SECRET" \
+  -H "Content-Type: application/json" \
+  -d '{"symbols": ["NABIL", "NICA"], "notify": true}'
+
+curl -sS http://127.0.0.1:8000/api/suggestions/latest
+curl -sS http://127.0.0.1:8000/api/watchlist
+curl -sS -X POST http://127.0.0.1:8000/api/watchlist \
+  -H "Content-Type: application/json" -d '{"symbols": ["NABIL", "NTC"]}'
+curl -sS -X DELETE http://127.0.0.1:8000/api/watchlist/NTC
+```
+
+* `symbols` is optional; without it (or with `[]`) the saved watchlist is used.
+* Send `Idempotency-Key: <unique>` on a cron retry: the same key returns the
+existing run (`200`) instead of generating and notifying again.
+* `notify` is accepted now; Discord delivery is wired in phase 4. The response
+always carries `run_id`, the suggestions, their `market` / `portfolio` context,
+and a `notification` summary (`skipped` until then).
+* Only `POST /api/suggestions` is behind `CRON_SECRET`; `GET
+/api/suggestions/latest` and the watchlist routes are read/write public JSON
+like the rest of the API.
+* 401 for a missing/wrong secret, 400 for bad input, 503 when the server has no
+`CRON_SECRET` or no Neon connection, 201 for a new run, 200 for an idempotent
+replay.
+
+Generate the secret with `python -c "import secrets;print(secrets.token_urlsafe(32))"`
+and put it in the server's environment and the cron job's secret store.
+
+Engine knobs (config `suggest`, overridable by env): `risk_per_trade_pct`
+(`SUGGEST_RISK_PER_TRADE_PCT`), `max_position_pct`, `max_positions`,
+`min_confidence` (`SUGGEST_MIN_CONFIDENCE`), `lookback_days`
+(`SUGGEST_LOOKBACK_DAYS`), `buy_threshold`, `sell_threshold`, `atr_mult`,
+`target_r`, `sell_fraction`, `min_history_trades`, `concurrency`
+(`SUGGEST_CONCURRENCY`). Market data is fetched one symbol at a time because
+the official NEPSE client shares one short-lived token; the analysis runs in a
+bounded thread pool.
+
+### Cron
+
+crontab (server running the API, 15:15 NPT on weekdays):
+
+```cron
+15 15 * * 1-5 curl -fsS -X POST http://127.0.0.1:8000/api/suggestions -H "Authorization: Bearer $CRON_SECRET" -H "Content-Type: application/json" -H "Idempotency-Key: $(date +%F)" -d '{}' >/dev/null
+```
+
+GitHub Actions:
+
+```yaml
+on:
+  schedule: [{cron: "15 9 * * 1-5"}]   # 09:15 UTC = 15:00 NPT
+jobs:
+  suggestions:
+    runs-on: ubuntu-latest
+    steps:
+      - run: |
+          curl -fsS -X POST "$API_URL/api/suggestions" \
+            -H "Authorization: Bearer ${{ secrets.CRON_SECRET }}" \
+            -H "Content-Type: application/json" \
+            -H "Idempotency-Key: ${{ github.run_id }}" \
+            -d '{"notify": true}'
+        env:
+          API_URL: ${{ secrets.API_URL }}
+```
+
+Vercel cron (only if this API is deployed to Vercel; Vercel sends
+`Authorization: Bearer $CRON_SECRET` for you):
+
+```json
+{ "crons": [{ "path": "/api/suggestions", "schedule": "15 9 * * 1-5" }] }
+```
+
 ## Tests
 
 ```bash
