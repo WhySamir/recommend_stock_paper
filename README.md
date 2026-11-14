@@ -457,15 +457,49 @@ already in the environment.
 python -m unittest discover -s tests -v
 ```
 
-Twenty-six offline tests: the engine's original twelve (CSV round-trip, API
-field mapping and `symbol_map`, env expansion, breakout detection,
-lot/limit/charge-aware sizing, BLOCK on a tiny account, deterministic simulation,
-history accounting, alert firing once, the full CLI chain) plus fourteen for the
-official source: token offsets against WASM samples, token parsing, OHLCV
-mapping, synthetic opens, cache TTL, cache merging, stale-cache fallback,
-future-date filtering, quote fallback, live session open, next-open plan entry,
-entry overrides, unknown symbols, and `kind: "nepse"` recognition. None of them
-touch the network.
+107 tests across five files. The webhook and every market-data call are faked:
+no test sends to Discord and no test touches NEPSE.
+
+* `tests/test_offline.py` (13) — CSV round-trip, HTTP field mapping and
+  `symbol_map`, env expansion, breakout detection, lot/limit/charge-aware
+  sizing, BLOCK on a tiny account, deterministic simulation, history
+  accounting, alert firing once, the full CLI chain.
+* `tests/test_api.py` (22) — the JSON API: every route, CORS, error statuses.
+* `tests/test_nepse_official.py` (14) — token offsets against WASM samples,
+  token parsing, OHLCV mapping, synthetic opens, cache TTL and merging,
+  stale-cache fallback, future-date filtering, live session behaviour.
+* `tests/test_suggestions.py` (25) — indicators (SMA/EMA/MACD/RSI/ATR/stdev,
+  short-history and seed behaviour), technical score sign and bounds,
+  BUY/SELL/HOLD thresholds, confidence floor, action band, whole-lot sizing,
+  cash cap, risk budget, concentration and `max_positions` limits, sells never
+  above the shares held, `sell_fraction` rounding, bad and short-history
+  symbols, the market clock, and the backtest shape.
+* `tests/test_discord.py` (19) — summary and per-suggestion embeds, colours,
+  footer, missing price/confidence, 10-embed and 6000-character chunking,
+  truncation, message numbering, 429 `retry_after`, 5xx retry, the four-attempt
+  cap, hard failures that never echo the URL, and `send_run` returning a dict
+  for skips, errors and unexpected exceptions.
+
+`tests/test_runs_api.py` (14) is the integration suite: it calls
+`POST /api/suggestions` on a real server against Neon and checks auth
+(401/503), validation (400), the success path (201 plus rows in
+`suggestion_runs` and `suggestions`), idempotent replay (200, one run),
+`GET /api/suggestions/latest`, watchlist CRUD and the watchlist fallback,
+send-once-per-run, and a Discord failure still returning 201. It uses a
+temporary CSV fixture, deletes every run it creates, and removes the watchlist
+symbols it adds.
+
+That suite needs `NEON_CONN_URL` (environment or `.env`) and skips when there
+is none, so offline runs stay green:
+
+```bash
+python -m unittest tests.test_suggestions tests.test_discord -v   # offline only
+python -m unittest tests.test_runs_api -v                        # Neon, ~2 min
+```
+
+There is no npm project here; `python -m unittest discover -s tests` is the
+build-and-test gate (`python -m compileall -q nepse_trader` catches syntax
+errors).
 
 ## Not financial advice
 

@@ -224,7 +224,8 @@ def post(payload, url=None, opener=None, sleep=time.sleep, attempts=MAX_ATTEMPTS
                 sleep(_retry_after(exc, attempt))
                 continue
             raise DiscordError("discord returned HTTP %d" % exc.code)
-        except urllib.error.URLError:
+        except OSError:
+            # URLError, DNS failures, timeouts — all OSError subclasses.
             if attempt < attempts:
                 sleep(min(2.0 ** attempt, 8.0))
                 continue
@@ -265,6 +266,13 @@ def send_run(cfg, run_id, suggestions_list):
             "sent": False,
             "status": "error",
             "reason": str(exc)[:300],
+            "messages": 0,
+        }
+    except Exception as exc:  # never, ever break the caller
+        return {
+            "sent": False,
+            "status": "error",
+            "reason": "discord delivery failed (%s)" % exc.__class__.__name__,
             "messages": 0,
         }
     result["reason"] = ""
