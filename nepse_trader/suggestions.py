@@ -45,6 +45,7 @@ ENV_OVERRIDES = {
     "sell_threshold": ("SUGGEST_SELL_THRESHOLD", float),
     "atr_mult": ("SUGGEST_ATR_MULT", float),
     "target_r": ("SUGGEST_TARGET_R", float),
+    "concurrency": ("SUGGEST_CONCURRENCY", int),
 }
 
 
@@ -63,6 +64,7 @@ def params(cfg):
         ("atr_mult", 2.0),
         ("target_r", 2.5),
         ("min_history_trades", 5),
+        ("concurrency", 4),
     ):
         out.setdefault(key, default)
     out.setdefault(
@@ -381,6 +383,8 @@ def generate(cfg, symbols, source=None):
 
     source = source or data_mod.open_source(cfg)
     bars_by_symbol, errors, prices = {}, {}, {}
+    # Market data is fetched one symbol at a time: the official NEPSE client
+    # keeps a single short-lived token and is not safe to drive concurrently.
     for symbol in names:
         if not SYMBOL_RE.match(symbol):
             errors[symbol] = (
@@ -401,6 +405,23 @@ def generate(cfg, symbols, source=None):
         bars_by_symbol[symbol] = bars
         prices[symbol] = bars[-1]["close"]
 
+    lookback = max(MIN_BARS, int(params["lookback_days"]))
+
+    def analyse(symbol):
+        window = bars_by_symbol[symbol][-lookback:]
+        score, signals = technical_score(window, params)
+        return symbol, window, score, signals, backtest(window, params)
+
+    workers = max(1, min(int(params.get("concurrency") or 1), len(bars_by_symbol)))
+    if workers > 1:
+        from concurrent.futures import ThreadPoolExecutor
+
+        with ThreadPoolExecutor(max_workers=workers) as pool:
+            analysed = list(pool.map(analyse, list(bars_by_symbol)))
+    else:
+        analysed = [analyse(symbol) for symbol in bars_by_symbol]
+    analysis = {row[0]: row[1:] for row in analysed}
+
     book = portfolio_mod.snapshot(cfg, prices=prices, source=source)
     portfolio_value = book["portfolio_value"] or float(cfg["account"]["cash"])
     held = {row["symbol"]: row for row in book["positions"]}
@@ -414,11 +435,7 @@ def generate(cfg, symbols, source=None):
             suggestions.append(_error_suggestion(symbol, errors[symbol], market))
             continue
 
-        bars = bars_by_symbol[symbol]
-        lookback = max(MIN_BARS, int(params["lookback_days"]))
-        window = bars[-lookback:]
-        score, signals = technical_score(window, params)
-        stats = backtest(window, params)
+        window, score, signals, stats = analysis[symbol]
         confidence, multiplier = _confidence(score, stats, params)
         price = window[-1]["close"]
         atr = ind.atr_last(window, 14) or 0.0

@@ -11,6 +11,7 @@ keeps a shared token.
 from __future__ import annotations
 
 import argparse
+import hmac
 import json
 import os
 import re
@@ -26,7 +27,9 @@ from . import cli as cli_mod
 from . import config as config_mod
 from . import data as data_mod
 from . import indicators as ind
+from . import db as db_mod
 from . import plan as plan_mod
+from . import runs as runs_mod
 from . import scan as scan_mod
 from . import simulation as simulation_mod
 from . import store
@@ -376,8 +379,34 @@ class Handler(BaseHTTPRequestHandler):
         if origin in self.cors_origins:
             self.send_header("Access-Control-Allow-Origin", origin)
             self.send_header("Vary", "Origin")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+        self.send_header(
+            "Access-Control-Allow-Headers", "Content-Type, Authorization, Idempotency-Key"
+        )
+
+    def _json_body(self):
+        length = int(self.headers.get("Content-Length", "0"))
+        if length > 1024 * 1024:
+            raise ApiError("request body is too large", 400)
+        try:
+            # utf-8-sig so a client that prefixes a BOM (PowerShell, .NET) works
+            payload = json.loads(self.rfile.read(length).decode("utf-8-sig") or "{}")
+        except (ValueError, UnicodeDecodeError):
+            raise ApiError("request body must be valid JSON", 400)
+        if not isinstance(payload, dict):
+            raise ApiError("request body must be a JSON object", 400)
+        return payload
+
+    def _require_cron(self):
+        """Constant-time Bearer check against the CRON_SECRET env var."""
+        secret = (os.environ.get("CRON_SECRET") or "").strip()
+        if not secret:
+            raise ApiError("CRON_SECRET is not configured on the server", 503)
+        header = self.headers.get("Authorization") or ""
+        if not header.startswith("Bearer "):
+            raise ApiError("unauthorized: send Authorization: Bearer <CRON_SECRET>", 401)
+        if not hmac.compare_digest(header[len("Bearer ") :].strip(), secret):
+            raise ApiError("unauthorized", 401)
 
     def _send(self, payload, status=200):
         body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
@@ -402,8 +431,62 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Length", "0")
         self.end_headers()
 
+    def do_DELETE(self):
+        parts = [p for p in self.path.split("?")[0].split("/") if p]
+        if len(parts) != 3 or parts[0] != "api" or parts[1] != "watchlist":
+            return self._error("unknown route %s" % self.path, 404)
+        symbol = parts[2].upper()
+        if not re.fullmatch(r"[A-Z0-9&_.-]{1,24}", symbol):
+            return self._error("bad symbol %r" % parts[2], 400)
+        try:
+            removed = runs_mod.remove_symbol(symbol)
+            return self._send(
+                {"removed": removed, "symbols": runs_mod.watchlist()}
+            )
+        except runs_mod.RunError as exc:
+            return self._error(str(exc), 400)
+        except db_mod.DbError as exc:
+            return self._error(str(exc), 503)
+        except Exception as exc:
+            return self._error("watchlist update failed: %s" % exc, 500)
+
     def do_POST(self):
         route = self.path.split("?")[0].rstrip("/")
+        if route == "/api/suggestions":
+            try:
+                self._require_cron()
+                body = self._json_body()
+                notify = body.get("notify", False)
+                if not isinstance(notify, bool):
+                    raise ApiError("notify must be true or false", 400)
+                payload = runs_mod.execute(
+                    self.app.cfg,
+                    body.get("symbols"),
+                    notify=notify,
+                    idempotency_key=(self.headers.get("Idempotency-Key") or "").strip()
+                    or None,
+                )
+                return self._send(payload, 200 if payload.get("idempotent") else 201)
+            except ApiError as exc:
+                return self._error(str(exc), exc.status)
+            except runs_mod.RunError as exc:
+                return self._error(str(exc), 400)
+            except db_mod.DbError as exc:
+                return self._error(str(exc), 503)
+            except Exception as exc:  # never leak a traceback to the cron job
+                return self._error("suggestion run failed: %s" % exc, 500)
+        if route == "/api/watchlist":
+            try:
+                body = self._json_body()
+                return self._send({"symbols": runs_mod.add_symbols(body.get("symbols"))})
+            except ApiError as exc:
+                return self._error(str(exc), exc.status)
+            except runs_mod.RunError as exc:
+                return self._error(str(exc), 400)
+            except db_mod.DbError as exc:
+                return self._error(str(exc), 503)
+            except Exception as exc:
+                return self._error("watchlist update failed: %s" % exc, 500)
         if route == "/api/simulations":
             try:
                 length = int(self.headers.get("Content-Length", "0"))
@@ -422,7 +505,11 @@ class Handler(BaseHTTPRequestHandler):
             except Exception as exc:
                 return self._error("simulation failed: %s" % exc, 500)
         if route != "/api/alerts/check":
-            return self._error("POST is only supported on /api/alerts/check and /api/simulations", 405)
+            return self._error(
+                "POST is only supported on /api/suggestions, /api/watchlist, "
+                "/api/alerts/check and /api/simulations",
+                405,
+            )
         try:
             app = self.app
             path = alerts_mod.path_for(app.cfg)
@@ -466,6 +553,11 @@ class Handler(BaseHTTPRequestHandler):
                             "GET /api/simulations": "saved custom simulations",
                             "GET /api/simulations/{id}": "saved custom simulation result",
                             "POST /api/alerts/check": "evaluate alerts against the latest quote",
+                            "POST /api/suggestions": "BUY/SELL/HOLD run (Bearer CRON_SECRET; JSON body)",
+                            "GET /api/suggestions/latest": "latest persisted suggestion run",
+                            "GET /api/watchlist": "watchlist symbols used when a run omits symbols",
+                            "POST /api/watchlist": "add symbols to the watchlist",
+                            "DELETE /api/watchlist/{symbol}": "remove a symbol from the watchlist",
                         },
                     }
                 )
@@ -488,6 +580,15 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send({"alerts": alerts_mod.load(alerts_mod.path_for(app.cfg))})
             if path == "/api/simulations":
                 return self._send(app.simulations())
+            if path == "/api/watchlist":
+                return self._send(
+                    {"name": store.DEFAULT_WATCHLIST, "symbols": runs_mod.watchlist()}
+                )
+            if path == "/api/suggestions/latest":
+                payload = runs_mod.latest()
+                if payload is None:
+                    raise ApiError("no suggestion runs yet", 404)
+                return self._send(payload)
             if path == "/api/scan":
                 symbols = app.symbols(query)
                 if len(symbols) > 200:
@@ -560,6 +661,8 @@ class Handler(BaseHTTPRequestHandler):
             return self._error("unknown route %s" % path, 404)
         except ApiError as exc:
             self._error(str(exc), exc.status)
+        except db_mod.DbError as exc:
+            self._error(str(exc), 503)
         except data_mod.DataError as exc:
             message = str(exc)
             status = 404 if "not in the NEPSE security list" in message or "no data for" in message else 502
