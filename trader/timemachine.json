@@ -1,0 +1,201 @@
+{
+  "symbol": "CREST",
+  "as_of": "2026-11-06",
+  "plan": {
+    "symbol": "CREST",
+    "setup": "breakout",
+    "signal_date": "2026-11-06",
+    "entry": 1192.0,
+    "stop": 1104.5,
+    "target": 1410.75,
+    "risk_per_share": 87.5,
+    "reward_per_share": 218.75,
+    "reward_risk": 2.5,
+    "stop_basis": "range midpoint",
+    "setup_low": 1017.0,
+    "atr": 58.11,
+    "band_upper": 1201.63,
+    "max_hold_days": 10,
+    "entry_basis": "signal close",
+    "note": "target is 18.4% above entry: needs more than one session (band top today 1201.63)",
+    "volume_ratio": 3.83,
+    "setups": [
+      "breakout",
+      "bounce"
+    ]
+  },
+  "history": {
+    "firings": 14,
+    "target_first": 3,
+    "stop_first": 9,
+    "timeout": 2,
+    "hit_rate_pct": 21.4,
+    "expectancy_r": -0.16,
+    "trades": [
+      {
+        "signal_date": "2025-12-15",
+        "entry_date": "2025-12-16",
+        "setup": "bounce",
+        "entry": 1241.1,
+        "stop": 1231.05,
+        "target": 1266.22,
+        "outcome": "target",
+        "r": 2.5,
+        "sessions": 1
+      },
+      {
+        "signal_date": "2025-12-23",
+        "entry_date": "2025-12-24",
+        "setup": "bounce",
+        "entry": 1219.0,
+        "stop": 1200.0,
+        "target": 1266.5,
+        "outcome": "stop",
+        "r": -1.0,
+        "sessions": 1
+      },
+      {
+        "signal_date": "2026-01-21",
+        "entry_date": "2026-01-22",
+        "setup": "breakout",
+        "entry": 1305.0,
+        "stop": 1243.0,
+        "target": 1460.0,
+        "outcome": "target",
+        "r": 2.5,
+        "sessions": 1
+      },
+      {
+        "signal_date": "2026-01-22",
+        "entry_date": "2026-01-25",
+        "setup": "breakout",
+        "entry": 1360.0,
+        "stop": 1270.64,
+        "target": 1583.4,
+        "outcome": "target",
+        "r": 2.5,
+        "sessions": 9
+      },
+      {
+        "signal_date": "2026-01-25",
+        "entry_date": "2026-01-26",
+        "setup": "breakout",
+        "entry": 1495.0,
+        "stop": 1388.74,
+        "target": 1760.65,
+        "outcome": "stop",
+        "r": -1.0,
+        "sessions": 1
+      },
+      {
+        "signal_date": "2026-02-01",
+        "entry_date": "2026-02-02",
+        "setup": "breakout",
+        "entry": 1568.7,
+        "stop": 1415.64,
+        "target": 1951.35,
+        "outcome": "stop",
+        "r": -1.0,
+        "sessions": 7
+      },
+      {
+        "signal_date": "2026-02-12",
+        "entry_date": "2026-02-16",
+        "setup": "bounce",
+        "entry": 1447.0,
+        "stop": 1381.5,
+        "target": 1610.75,
+        "outcome": "stop",
+        "r": -1.0,
+        "sessions": 1
+      },
+      {
+        "signal_date": "2026-03-09",
+        "entry_date": "2026-03-10",
+        "setup": "flag",
+        "entry": 1532.9,
+        "stop": 1422.0,
+        "target": 1810.15,
+        "outcome": "stop",
+        "r": -1.0,
+        "sessions": 2
+      },
+      {
+        "signal_date": "2026-03-19",
+        "entry_date": "2026-03-22",
+        "setup": "bounce",
+        "entry": 1429.5,
+        "stop": 1398.8,
+        "target": 1506.25,
+        "outcome": "stop",
+        "r": -1.0,
+        "sessions": 2
+      },
+      {
+        "signal_date": "2026-05-22",
+        "entry_date": "2026-05-25",
+        "setup": "breakout",
+        "entry": 1318.0,
+        "stop": 1167.5,
+        "target": 1694.25,
+        "outcome": "timeout",
+        "r": -0.25,
+        "sessions": 10
+      },
+      {
+        "signal_date": "2026-05-27",
+        "entry_date": "2026-06-01",
+        "setup": "breakout",
+        "entry": 1350.0,
+        "stop": 1183.5,
+        "target": 1766.25,
+        "outcome": "timeout",
+        "r": -0.54,
+        "sessions": 10
+      },
+      {
+        "signal_date": "2026-06-08",
+        "entry_date": "2026-06-09",
+        "setup": "breakout",
+        "entry": 1419.0,
+        "stop": 1236.5,
+        "target": 1875.25,
+        "outcome": "stop",
+        "r": -1.0,
+        "sessions": 6
+      },
+      {
+        "signal_date": "2026-06-17",
+        "entry_date": "2026-06-18",
+        "setup": "bounce",
+        "entry": 1264.9,
+        "stop": 1247.45,
+        "target": 1308.53,
+        "outcome": "stop",
+        "r": -1.0,
+        "sessions": 1
+      },
+      {
+        "signal_date": "2026-08-25",
+        "entry_date": "2026-08-26",
+        "setup": "bounce",
+        "entry": 1253.0,
+        "stop": 1140.6,
+        "target": 1534.0,
+        "outcome": "stop",
+        "r": -1.0,
+        "sessions": 1
+      }
+    ]
+  },
+  "simulation": {
+    "iterations": 10000,
+    "seed": 19,
+    "sessions_bootstrapped": 233,
+    "target_first_pct": 12.9,
+    "stop_first_pct": 49.3,
+    "timeout_pct": 37.8,
+    "expectancy_r": -0.03
+  },
+  "caveat": "Simulation, not a prediction. Daily NEPSE bars cannot resolve whether a stop or target printed first inside a session, so a bar touching both is scored as a stop. Gaps and circuit halts can fill far worse than the stop price."
+}

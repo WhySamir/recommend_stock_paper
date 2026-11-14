@@ -1,0 +1,40 @@
+{
+  "as_of": "2026-11-06",
+  "scanned": 1,
+  "candidates": [
+    {
+      "symbol": "CREST",
+      "date": "2026-11-06",
+      "close": 1192.0,
+      "prev_close": 1044.9,
+      "atr": 58.11,
+      "volume": 19655,
+      "volume_ratio": 3.83,
+      "band_upper": 1201.63,
+      "band_lower": 888.17,
+      "needs_intraday": false,
+      "setup": "breakout",
+      "trigger": 1134.0,
+      "setup_low": 1017.0,
+      "detail": "closed 5.11% above the 20-day high on 3.83x volume"
+    },
+    {
+      "symbol": "CREST",
+      "date": "2026-11-06",
+      "close": 1192.0,
+      "prev_close": 1044.9,
+      "atr": 58.11,
+      "volume": 19655,
+      "volume_ratio": 3.83,
+      "band_upper": 1201.63,
+      "band_lower": 888.17,
+      "needs_intraday": false,
+      "setup": "bounce",
+      "trigger": 1192.0,
+      "setup_low": 1014.0,
+      "detail": "RSI2 was 11, then closed up on the day",
+      "rsi2": 11.1
+    }
+  ],
+  "errors": []
+}

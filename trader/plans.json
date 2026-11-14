@@ -1,0 +1,25 @@
+[
+  {
+    "symbol": "CREST",
+    "setup": "breakout",
+    "signal_date": "2026-11-06",
+    "entry": 1192.0,
+    "stop": 1104.5,
+    "target": 1410.75,
+    "risk_per_share": 87.5,
+    "reward_per_share": 218.75,
+    "reward_risk": 2.5,
+    "stop_basis": "range midpoint",
+    "setup_low": 1017.0,
+    "atr": 58.11,
+    "band_upper": 1201.63,
+    "max_hold_days": 10,
+    "entry_basis": "signal close",
+    "note": "target is 18.4% above entry: needs more than one session (band top today 1201.63)",
+    "volume_ratio": 3.83,
+    "setups": [
+      "breakout",
+      "bounce"
+    ]
+  }
+]

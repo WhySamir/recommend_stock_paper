@@ -1,0 +1,32 @@
+[
+  {
+    "symbol": "CREST",
+    "kind": "stop",
+    "level": 1104.5,
+    "note": "stop from plan",
+    "since": "",
+    "sessions": 0,
+    "triggered": false,
+    "triggered_on": ""
+  },
+  {
+    "symbol": "CREST",
+    "kind": "target",
+    "level": 1410.75,
+    "note": "target from plan",
+    "since": "",
+    "sessions": 0,
+    "triggered": false,
+    "triggered_on": ""
+  },
+  {
+    "symbol": "CREST",
+    "kind": "max_hold",
+    "level": null,
+    "note": "flat: 10 sessions held",
+    "since": "2026-11-06",
+    "sessions": 10,
+    "triggered": false,
+    "triggered_on": ""
+  }
+]
