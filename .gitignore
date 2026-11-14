@@ -1,3 +1,5 @@
 .env
 .claude
 .freebuff
+__pycache__/
+*.pyc
