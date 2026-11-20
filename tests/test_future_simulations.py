@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import unittest
 from datetime import date, datetime, timezone
+from unittest.mock import patch
 
 from nepse_trader import config, future_simulations as fs
 
@@ -24,6 +25,20 @@ class DateAndOutcomeTests(unittest.TestCase):
             fs.due_date(date(2026, 11, 20), 4, {"2026-11-24"}), date(2026, 11, 25)
         )
         self.assertEqual(fs.due_date(date(2026, 11, 21), 1, set()), date(2026, 11, 23))
+
+    def test_trading_sessions_match_calendar_due_date(self):
+        self.assertEqual(
+            fs.trading_sessions(date(2026, 11, 20), date(2026, 11, 24), set()), 2
+        )
+        self.assertEqual(
+            fs.trading_sessions(date(2026, 11, 20), date(2026, 11, 30), set()), 6
+        )
+        self.assertEqual(
+            fs.trading_sessions(
+                date(2026, 11, 20), date(2026, 11, 25), {"2026-11-24"}
+            ),
+            2,
+        )
 
     def test_outcome_buy_and_sell_charge_both_legs(self):
         cfg = config.DEFAULTS
@@ -51,9 +66,28 @@ class RecordTests(unittest.TestCase):
                                iterations=50, seed=7, now=self.now)
         self.assertEqual([h["days"] for h in record["horizons"]], [4, 10])
         self.assertEqual([h["due_date"] for h in record["horizons"]], ["2026-11-24", "2026-11-30"])
+        self.assertEqual([h["forecast_sessions"] for h in record["horizons"]], [2, 6])
         self.assertEqual(record["status"], "pending")
         self.assertIn("expected_net_pnl", record["horizons"][0]["forecast"])
         self.assertNotIn("sample_outcomes", record["horizons"][0]["forecast"])
+
+    def test_new_record_without_history_keeps_null_forecast(self):
+        record = fs.new_record(
+            "NEW", "buy", 1, 100.0, 4, self.cfg, self.bars[:1], now=self.now
+        )
+        self.assertTrue(
+            all(value is None for value in record["horizons"][0]["forecast"].values())
+        )
+
+    def test_new_record_does_not_hide_simulation_errors(self):
+        with patch(
+            "nepse_trader.future_simulations.simulation_mod.run",
+            side_effect=ValueError("boom"),
+        ):
+            with self.assertRaisesRegex(ValueError, "boom"):
+                fs.new_record(
+                    "NABIL", "buy", 1, 100.0, 4, self.cfg, self.bars, now=self.now
+                )
 
     def test_settle_uses_due_bar_and_freezes_result(self):
         record = fs.new_record("NABIL", "buy", 10, 574.0, 4, self.cfg, self.bars, now=self.now)

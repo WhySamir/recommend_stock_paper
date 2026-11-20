@@ -14,9 +14,10 @@ from . import simulation as simulation_mod
 from .simulation import _fees
 
 CAVEAT = (
-    "Forecast only until settled; the settled result uses the close on the "
-    "stored due date and the charges in the saved record. It is not a broker "
-    "order or a prediction."
+    "Forecast only until settled; it bootstraps the trading sessions between "
+    "creation and the calendar-day due date. The settled result uses the close "
+    "on the stored due date and the charges in the saved record. It is not a "
+    "broker order or a prediction."
 )
 FORECAST_KEYS = (
     "expected_net_pnl",
@@ -51,13 +52,30 @@ def normalise_days(raw):
     return days
 
 
+def _holiday_keys(holidays):
+    """Normalise configured holidays to ISO date strings."""
+    return {str(item) for item in holidays or ()}
+
+
 def due_date(start, days, holidays):
     """Add calendar days, then roll forward past weekends and holidays."""
     result = start + timedelta(days=days)
-    closed = set(holidays or ())
+    closed = _holiday_keys(holidays)
     while result.weekday() >= 5 or result.isoformat() in closed:
         result += timedelta(days=1)
     return result
+
+
+def trading_sessions(start, due, holidays):
+    """Count tradable weekdays after ``start`` through ``due``."""
+    closed = _holiday_keys(holidays)
+    current = start + timedelta(days=1)
+    sessions = 0
+    while current <= due:
+        if current.weekday() < 5 and current.isoformat() not in closed:
+            sessions += 1
+        current += timedelta(days=1)
+    return sessions
 
 
 def outcome(action, shares, price, exit_price, cfg):
@@ -94,15 +112,19 @@ def new_record(symbol, action, shares, price, days, cfg, bars, iterations=1000, 
     start = today_npt(now)
     holidays = cfg.get("holidays") or ()
     seed = cfg["timemachine"]["seed"] if seed is None else seed
+    has_history = any(
+        previous["close"] > 0 for previous, current in zip(bars, bars[1:])
+    )
     horizons = []
     for count in normalise_days(days):
         due = due_date(start, count, holidays)
-        try:
+        sessions = trading_sessions(start, due, holidays)
+        if has_history:
             result = simulation_mod.run(
-                symbol, bars, action, shares, count, price, iterations, seed, cfg
+                symbol, bars, action, shares, sessions, price, iterations, seed, cfg
             )
             forecast = {key: result["forecast"][key] for key in FORECAST_KEYS}
-        except ValueError:
+        else:
             # A brand-new symbol may not have enough cached bars to bootstrap
             # a forecast; the paper trade can still be logged and settled.
             forecast = {key: None for key in FORECAST_KEYS}
@@ -110,6 +132,7 @@ def new_record(symbol, action, shares, price, days, cfg, bars, iterations=1000, 
             {
                 "days": count,
                 "due_date": due.isoformat(),
+                "forecast_sessions": sessions,
                 "status": "pending",
                 "forecast": forecast,
             }

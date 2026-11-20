@@ -247,7 +247,9 @@ and `2026-11-30`. Each horizon reports `exit_price`, `gross_pnl`, `fees`,
 0.36% + SEBON 0.015% plus the DP charge, from `config.json`. For `sell`, the
 saved price is today's sell price and the due-date close is the buyback cost;
 shares are assumed already held. The POST response also includes a forecast
-per horizon, which is an estimate only.
+per horizon. It bootstraps the trading sessions between creation and the
+calendar-day due date (shown as `forecast_sessions`), so it describes the same
+holding period that will be settled; it is still an estimate only.
 
 `/api/analyze` payload:
 
