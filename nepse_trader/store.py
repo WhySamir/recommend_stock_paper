@@ -131,6 +131,56 @@ def delete_simulation(simulation_id):
     return db.execute("delete from simulations where id = %s", (simulation_id,))
 
 
+# -- future simulations ------------------------------------------------
+
+
+def save_future_simulation(payload):
+    db.execute(
+        "insert into future_simulations (id, symbol, action, shares, price,"
+        " created_date, payload) values (%s, %s, %s, %s, %s, %s, %s)"
+        " on conflict (id) do update set payload = excluded.payload",
+        (
+            payload["id"],
+            payload.get("symbol") or "",
+            payload.get("action") or "",
+            int(payload.get("shares") or 0),
+            float(payload.get("price") or 0),
+            payload.get("created_date") or "",
+            db.jsonb(payload),
+        ),
+    )
+    return payload
+
+
+def get_future_simulation(simulation_id):
+    rows = db.fetch_all(
+        "select payload from future_simulations where id = %s", (simulation_id,)
+    )
+    return rows[0][0] if rows else None
+
+
+def list_future_simulations():
+    rows = db.fetch_all(
+        "select payload->>'id', payload->>'symbol', payload->>'action',"
+        " (payload->>'shares')::int, (payload->>'price')::double precision,"
+        " payload->>'created_date', payload->>'status', payload->>'generated_at'"
+        " from future_simulations order by created_at desc"
+    )
+    return [
+        {
+            "id": row[0],
+            "symbol": row[1],
+            "action": row[2],
+            "shares": row[3],
+            "price": row[4],
+            "created_date": row[5],
+            "status": row[6],
+            "generated_at": row[7],
+        }
+        for row in rows
+    ]
+
+
 # -- paper positions --------------------------------------------------
 
 
