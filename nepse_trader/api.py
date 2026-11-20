@@ -373,6 +373,11 @@ class App:
     def _future_path(self, simulation_id):
         return self._future_dir() / (simulation_id + ".json")
 
+    def _write_future(self, path, payload):
+        temp = path.with_name(path.name + ".tmp")
+        temp.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+        os.replace(temp, path)
+
     def create_future_simulation(self, request):
         symbol = str(request.get("symbol") or "").strip().upper()
         if not re.fullmatch(r"[A-Z0-9&_.-]{1,24}", symbol):
@@ -424,32 +429,30 @@ class App:
             payload["simulation_dir"] = ""
             return store.save_future_simulation(payload)
         payload["simulation_dir"] = str(self._future_dir())
-        self._future_path(simulation_id).write_text(
-            json.dumps(payload, indent=2), encoding="utf-8"
-        )
+        self._write_future(self._future_path(simulation_id), payload)
         return payload
 
     def get_future_simulation(self, simulation_id, refresh=False):
         if not re.fullmatch(r"[A-Za-z0-9T_-]{1,80}", simulation_id):
             raise ApiError("bad simulation id", 400)
-        if store.backend() == "postgres":
-            payload = store.get_future_simulation(simulation_id)
-            if payload is None:
-                raise ApiError("simulation not found", 404)
-        else:
-            path = self._future_path(simulation_id)
-            if not path.is_file():
-                raise ApiError("simulation not found", 404)
-            payload = json.loads(path.read_text(encoding="utf-8"))
         with self.lock:
+            if store.backend() == "postgres":
+                payload = store.get_future_simulation(simulation_id)
+                if payload is None:
+                    raise ApiError("simulation not found", 404)
+            else:
+                path = self._future_path(simulation_id)
+                if not path.is_file():
+                    raise ApiError("simulation not found", 404)
+                payload = json.loads(path.read_text(encoding="utf-8"))
+            if payload.get("status") == "settled":
+                return payload
             bars = self.source.bars(payload["symbol"], refresh=refresh)
             updated = future_mod.settle(payload, bars)
-        if store.backend() == "postgres":
-            return store.save_future_simulation(updated)
-        self._future_path(simulation_id).write_text(
-            json.dumps(updated, indent=2), encoding="utf-8"
-        )
-        return updated
+            if store.backend() == "postgres":
+                return store.save_future_simulation(updated)
+            self._write_future(path, updated)
+            return updated
 
     def future_simulations(self):
         if store.backend() == "postgres":

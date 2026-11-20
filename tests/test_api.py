@@ -307,6 +307,9 @@ class FutureSimulationApiTests(unittest.TestCase):
         cls.patcher.stop()
         cls.tmp.cleanup()
 
+    def setUp(self):
+        self.__class__.today = date(2026, 11, 20)
+
     def request(self, path, method="GET", body=None):
         conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=20)
         headers = {"Content-Type": "application/json"} if body is not None else {}
@@ -315,6 +318,28 @@ class FutureSimulationApiTests(unittest.TestCase):
         payload = json.loads(response.read().decode("utf-8"))
         conn.close()
         return response.status, payload
+
+    def test_get_holds_lock_while_persisting(self):
+        status, body = self.request(
+            "/api/future-simulations",
+            method="POST",
+            body={"symbol": "NABIL", "shares": 1, "price": 574, "days": 4},
+        )
+        self.assertEqual(status, 201)
+        app = self.server.RequestHandlerClass.app
+        observed = []
+        original_write = Path.write_text
+
+        def tracking_write(path, *args, **kwargs):
+            if body["id"] in str(path):
+                observed.append(app.lock.locked())
+            return original_write(path, *args, **kwargs)
+
+        self.__class__.today = date(2026, 11, 30)
+        with patch.object(Path, "write_text", tracking_write):
+            status, _ = self.request("/api/future-simulations/" + body["id"])
+        self.assertEqual(status, 200)
+        self.assertEqual(observed, [True])
 
     def test_log_settle_and_list_future_simulation(self):
         status, body = self.request(
@@ -341,6 +366,15 @@ class FutureSimulationApiTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual([h["status"] for h in settled["horizons"]], ["settled", "settled"])
         self.assertEqual(settled["status"], "settled")
+
+        app = self.server.RequestHandlerClass.app
+        with patch.object(app.source, "bars", side_effect=AssertionError("bars refetched")):
+            status, again = self.request("/api/future-simulations/" + body["id"])
+        self.assertEqual(status, 200)
+        self.assertEqual(
+            [h["net_pnl"] for h in again["horizons"]],
+            [h["net_pnl"] for h in settled["horizons"]],
+        )
 
         status, listing = self.request("/api/future-simulations")
         self.assertEqual(status, 200)
