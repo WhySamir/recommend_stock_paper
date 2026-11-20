@@ -352,6 +352,9 @@ python -m nepse_trader.db --smoke                     # CRUD end to end
 ```
 
 `migrations/*.sql` are applied once each and tracked in `schema_migrations`.
+The API applies pending migrations when it starts with `NEON_CONN_URL` set, so a
+host that only runs the start command (Render, Railway) picks up new tables
+without a manual step.
 The imported files are `trader/scan.json`, `plans.json`, `orders.json`,
 `timemachine.json` (as `state_snapshots`), `trader/alerts.json` (`alerts`) and
 `trader/simulations/*/result.json` (`simulations`). The import is idempotent:

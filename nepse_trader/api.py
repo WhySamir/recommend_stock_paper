@@ -874,6 +874,18 @@ def main(argv=None):
     if env_port is not None and args.port is not None and args.port != env_port:
         print("nepse-trader API: using PORT=%d from the environment, not --port %d" % (env_port, args.port))
     cfg = config_mod.load(args.config)
+    if db_mod.enabled():
+        # Hosts like Render only run the start command, so apply any pending
+        # migrations here instead of failing on the first query.
+        try:
+            applied = db_mod.migrate()
+        except Exception as exc:
+            print("nepse-trader API: schema check failed: %s" % exc)
+        else:
+            print(
+                "nepse-trader API: schema ok (%s)"
+                % (", ".join(applied) if applied else "no new migrations")
+            )
     server = build_server(cfg, host, port)
     print(
         "nepse-trader API on http://%s:%d  (config %s, data %s)"
