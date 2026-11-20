@@ -1,0 +1,180 @@
+{
+  "symbol": "SMH",
+  "action": "buy",
+  "shares": 100,
+  "days": 4,
+  "entry_price": 574.0,
+  "as_of": "2026-11-19",
+  "history_bars": 228,
+  "sessions_bootstrapped": 227,
+  "iterations": 10000,
+  "seed": 19,
+  "forecast": {
+    "expected_exit_price": 571.47,
+    "expected_net_pnl": -732.66,
+    "best_net_pnl": 13135.85,
+    "worst_net_pnl": -12409.07,
+    "p10_net_pnl": -3368.94,
+    "p50_net_pnl": -865.77,
+    "p90_net_pnl": 2065.12,
+    "profit_probability_pct": 33.0,
+    "loss_probability_pct": 67.0
+  },
+  "sample_outcomes": [
+    {
+      "exit_price": 552.18,
+      "gross_pnl": -2182.24,
+      "fees": 472.32,
+      "net_pnl": -2654.55
+    },
+    {
+      "exit_price": 570.5,
+      "gross_pnl": -349.81,
+      "fees": 479.19,
+      "net_pnl": -829.0
+    },
+    {
+      "exit_price": 588.75,
+      "gross_pnl": 1475.37,
+      "fees": 486.03,
+      "net_pnl": 989.34
+    },
+    {
+      "exit_price": 565.44,
+      "gross_pnl": -856.4,
+      "fees": 477.29,
+      "net_pnl": -1333.69
+    },
+    {
+      "exit_price": 565.54,
+      "gross_pnl": -845.82,
+      "fees": 477.33,
+      "net_pnl": -1323.15
+    },
+    {
+      "exit_price": 573.99,
+      "gross_pnl": -1.5,
+      "fees": 480.49,
+      "net_pnl": -481.99
+    },
+    {
+      "exit_price": 536.37,
+      "gross_pnl": -3763.46,
+      "fees": 466.39,
+      "net_pnl": -4229.85
+    },
+    {
+      "exit_price": 552.09,
+      "gross_pnl": -2190.77,
+      "fees": 472.28,
+      "net_pnl": -2663.06
+    },
+    {
+      "exit_price": 587.31,
+      "gross_pnl": 1331.48,
+      "fees": 485.49,
+      "net_pnl": 845.99
+    },
+    {
+      "exit_price": 539.54,
+      "gross_pnl": -3446.43,
+      "fees": 467.58,
+      "net_pnl": -3914.0
+    },
+    {
+      "exit_price": 539.04,
+      "gross_pnl": -3495.9,
+      "fees": 467.39,
+      "net_pnl": -3963.3
+    },
+    {
+      "exit_price": 591.22,
+      "gross_pnl": 1722.46,
+      "fees": 486.96,
+      "net_pnl": 1235.5
+    },
+    {
+      "exit_price": 588.19,
+      "gross_pnl": 1418.84,
+      "fees": 485.82,
+      "net_pnl": 933.02
+    },
+    {
+      "exit_price": 554.86,
+      "gross_pnl": -1913.76,
+      "fees": 473.32,
+      "net_pnl": -2387.08
+    },
+    {
+      "exit_price": 589.71,
+      "gross_pnl": 1570.98,
+      "fees": 486.39,
+      "net_pnl": 1084.59
+    },
+    {
+      "exit_price": 479.39,
+      "gross_pnl": -9461.28,
+      "fees": 445.02,
+      "net_pnl": -9906.3
+    },
+    {
+      "exit_price": 544.76,
+      "gross_pnl": -2923.61,
+      "fees": 469.54,
+      "net_pnl": -3393.14
+    },
+    {
+      "exit_price": 646.37,
+      "gross_pnl": 7237.46,
+      "fees": 507.64,
+      "net_pnl": 6729.82
+    },
+    {
+      "exit_price": 585.18,
+      "gross_pnl": 1118.17,
+      "fees": 484.69,
+      "net_pnl": 633.48
+    },
+    {
+      "exit_price": 579.4,
+      "gross_pnl": 539.58,
+      "fees": 482.52,
+      "net_pnl": 57.06
+    },
+    {
+      "exit_price": 590.29,
+      "gross_pnl": 1628.52,
+      "fees": 486.61,
+      "net_pnl": 1141.91
+    },
+    {
+      "exit_price": 556.57,
+      "gross_pnl": -1743.25,
+      "fees": 473.96,
+      "net_pnl": -2217.21
+    },
+    {
+      "exit_price": 563.42,
+      "gross_pnl": -1057.69,
+      "fees": 476.53,
+      "net_pnl": -1534.23
+    },
+    {
+      "exit_price": 576.2,
+      "gross_pnl": 220.29,
+      "fees": 481.33,
+      "net_pnl": -261.03
+    },
+    {
+      "exit_price": 595.74,
+      "gross_pnl": 2174.2,
+      "fees": 488.65,
+      "net_pnl": 1685.54
+    }
+  ],
+  "generated_at": "2026-11-20T06:35:11Z",
+  "caveat": "Forecast only: future prices are bootstrapped from cached daily close returns. It is not a prediction or a broker order. Sell assumes you already own the shares; fees are estimated from config.",
+  "id": "20261120T063511Z-4152d69d",
+  "cache_dir": "data/cache",
+  "simulation_dir": "trader\\simulations\\20261120T063511Z-4152d69d"
+}
