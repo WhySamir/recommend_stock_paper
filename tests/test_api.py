@@ -380,6 +380,53 @@ class FutureSimulationApiTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertTrue(any(row["id"] == body["id"] for row in listing["simulations"]))
 
+    def test_fractional_numeric_inputs_are_400(self):
+        for field, value in (("shares", 1.5), ("iterations", 1.5), ("seed", 1.5)):
+            with self.subTest(field=field):
+                body = {"symbol": "NABIL", "shares": 1, "price": 10, "days": 4}
+                body[field] = value
+                status, error = self.request(
+                    "/api/future-simulations", method="POST", body=body
+                )
+                self.assertEqual(status, 400)
+                self.assertIn(field, error["error"])
+
+    def test_sell_price_alias_and_configured_holiday(self):
+        self.cfg["holidays"] = ["2026-11-24"]
+        try:
+            status, body = self.request(
+                "/api/future-simulations",
+                method="POST",
+                body={
+                    "symbol": "NABIL",
+                    "action": "sell",
+                    "shares": 2,
+                    "sell_price": 600,
+                    "days": 4,
+                },
+            )
+            self.assertEqual(status, 201)
+            self.assertEqual(body["price"], 600.0)
+            self.assertEqual(body["horizons"][0]["due_date"], "2026-11-25")
+
+            self.__class__.today = date(2026, 11, 25)
+            status, settled = self.request("/api/future-simulations/" + body["id"])
+            self.assertEqual(status, 200)
+            self.assertEqual(settled["horizons"][0]["status"], "settled")
+            self.assertEqual(settled["horizons"][0]["exit_price"], 605.0)
+            self.assertEqual(settled["horizons"][0]["result"], "loss")
+        finally:
+            self.cfg.pop("holidays", None)
+
+    def test_unknown_and_malformed_id(self):
+        status, error = self.request("/api/future-simulations/not!valid")
+        self.assertEqual(status, 400)
+        self.assertIn("error", error)
+
+        status, error = self.request("/api/future-simulations/DOESNOTEXIST")
+        self.assertEqual(status, 404)
+        self.assertIn("error", error)
+
     def test_invalid_horizon_is_400(self):
         status, error = self.request(
             "/api/future-simulations",

@@ -69,6 +69,23 @@ def _float(query, name):
         raise ApiError("%s must be a number" % name, 400)
 
 
+def _whole(value, name, low=None, high=None):
+    """Parse a JSON integer without silently truncating a fractional value."""
+    if isinstance(value, bool):
+        raise ApiError("%s must be an integer" % name, 400)
+    if isinstance(value, int):
+        number = value
+    elif isinstance(value, float) and value.is_integer():
+        number = int(value)
+    elif isinstance(value, str) and re.fullmatch(r"[+-]?\d+", value.strip()):
+        number = int(value)
+    else:
+        raise ApiError("%s must be an integer" % name, 400)
+    if (low is not None and number < low) or (high is not None and number > high):
+        raise ApiError("%s must be between %s and %s" % (name, low, high), 400)
+    return number
+
+
 def _flag(query, name, default=False):
     raw = (query.get(name) or [""])[0].strip().lower()
     if not raw:
@@ -385,15 +402,7 @@ class App:
         action = str(request.get("action") or "buy").strip().lower()
         if action not in ("buy", "sell"):
             raise ApiError("action must be buy or sell", 400)
-        shares = request.get("shares")
-        if isinstance(shares, bool):
-            raise ApiError("shares must be an integer", 400)
-        try:
-            shares = int(shares)
-        except (TypeError, ValueError):
-            raise ApiError("shares must be an integer", 400)
-        if not (1 <= shares <= 10000000):
-            raise ApiError("shares must be between 1 and 10000000", 400)
+        shares = _whole(request.get("shares"), "shares", low=1, high=10000000)
         price = request.get("price")
         if price is None:
             price = request.get("entry_price")
@@ -409,13 +418,13 @@ class App:
             raise ApiError("price must be positive", 400)
         try:
             days = future_mod.normalise_days(request.get("days", [4]))
-            iterations = int(request.get("iterations", 1000))
-            seed = request.get("seed")
-            seed = None if seed is None else int(seed)
         except ValueError as exc:
             raise ApiError(str(exc), 400)
-        if not (1 <= iterations <= MAX_ITERATIONS):
-            raise ApiError("iterations must be between 1 and %d" % MAX_ITERATIONS, 400)
+        iterations = _whole(
+            request.get("iterations", 1000), "iterations", low=1, high=MAX_ITERATIONS
+        )
+        seed = request.get("seed")
+        seed = None if seed is None else _whole(seed, "seed")
         with self.lock:
             bars = self.source.bars(symbol, refresh=bool(request.get("refresh", False)))
             payload = future_mod.new_record(
