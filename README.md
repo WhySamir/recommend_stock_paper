@@ -223,6 +223,32 @@ the cached history, so it is a range forecast rather than a promise about the
 price four sessions from now. `iterations` and `seed` can be supplied for a
 custom, reproducible forecast.
 
+### Future simulations (log a trade, check it later)
+
+`POST /api/future-simulations` saves a paper trade with one or more holding
+horizons. `days` may be a number or a list; each horizon gets a due date when
+the trade is logged, and `GET /api/future-simulations/{id}` settles it against
+the close on that date. A weekend or a date in `config.json` `holidays` pushes
+the due date forward. Once settled, the result is frozen — coming back later
+still shows the same due-date result, not today's price.
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/future-simulations \
+  -H "Content-Type: application/json" \
+  -d '{"symbol":"NABIL","action":"buy","shares":10,"entry_price":574,"days":[4,10]}'
+
+curl -sS http://127.0.0.1:8000/api/future-simulations/{id}
+curl -sS http://127.0.0.1:8000/api/future-simulations
+```
+
+For a trade logged on `2026-11-20`, `days: [4, 10]` settles on `2026-11-24`
+and `2026-11-30`. Each horizon reports `exit_price`, `gross_pnl`, `fees`,
+`net_pnl`, and `result` (`profit`, `loss`, or `break_even`). Charges are broker
+0.36% + SEBON 0.015% plus the DP charge, from `config.json`. For `sell`, the
+saved price is today's sell price and the due-date close is the buyback cost;
+shares are assumed already held. The POST response also includes a forecast
+per horizon, which is an estimate only.
+
 `/api/analyze` payload:
 
 ```json
