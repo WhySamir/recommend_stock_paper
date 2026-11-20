@@ -238,7 +238,7 @@ self.assertEqual([h["due_date"] for h in body["horizons"]], ["2026-11-24", "2026
 _path = Path(body["simulation_dir"], "result.json")
 self.assertTrue(_path.is_file())
 
-self.__class__.today = date(2026, 11, 26)
+self.__class__.today = date(2026, 11, 30)
 status, settled, _ = self.request("/api/future-simulations/" + body["id"])
 self.assertEqual(status, 200)
 self.assertEqual([h["status"] for h in settled["horizons"]], ["settled", "settled"])
