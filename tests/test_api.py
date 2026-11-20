@@ -8,6 +8,7 @@ import os
 import tempfile
 import threading
 import unittest
+from datetime import date
 from unittest.mock import patch
 from pathlib import Path
 
@@ -253,6 +254,106 @@ class ApiTests(unittest.TestCase):
     def test_post_elsewhere_is_405(self):
         status, _, _ = self.request("/api/scan", method="POST")
         self.assertEqual(status, 405)
+
+
+class FutureSimulationApiTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.tmp = tempfile.TemporaryDirectory()
+        root = Path(cls.tmp.name)
+        data_dir = root / "data"
+        data_dir.mkdir()
+        closes = [574.0, 576.0, 600.0, 605.0, 610.0, 615.0, 620.0]
+        dates = [
+            "2026-11-20", "2026-11-23", "2026-11-24", "2026-11-25",
+            "2026-11-26", "2026-11-27", "2026-11-30",
+        ]
+        bars = [
+            {
+                "date": day,
+                "open": close,
+                "high": close + 1,
+                "low": close - 1,
+                "close": close,
+                "volume": 1000.0,
+            }
+            for day, close in zip(dates, closes)
+        ]
+        data.write_csv(data_dir / "NABIL.csv", bars)
+
+        cfg = json.loads(json.dumps(config.DEFAULTS))
+        cfg["data"]["dir"] = str(data_dir)
+        cfg["data"]["cache_dir"] = str(data_dir)
+        cfg["data"]["kind"] = "csv"
+        cfg["state_dir"] = str(root / "trader")
+        cfg["universe"] = ["NABIL"]
+        cls.cfg = cfg
+        cls.today = date(2026, 11, 20)
+        cls.patcher = patch(
+            "nepse_trader.future_simulations.today_npt",
+            side_effect=lambda *args, **kwargs: cls.today,
+        )
+        cls.patcher.start()
+        cls.server = api.build_server(cfg, "127.0.0.1", 0)
+        cls.port = cls.server.server_address[1]
+        cls.thread = threading.Thread(target=cls.server.serve_forever, daemon=True)
+        cls.thread.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.server.shutdown()
+        cls.server.server_close()
+        cls.thread.join(timeout=5)
+        cls.patcher.stop()
+        cls.tmp.cleanup()
+
+    def request(self, path, method="GET", body=None):
+        conn = http.client.HTTPConnection("127.0.0.1", self.port, timeout=20)
+        headers = {"Content-Type": "application/json"} if body is not None else {}
+        conn.request(method, path, body=json.dumps(body) if body is not None else None, headers=headers)
+        response = conn.getresponse()
+        payload = json.loads(response.read().decode("utf-8"))
+        conn.close()
+        return response.status, payload
+
+    def test_log_settle_and_list_future_simulation(self):
+        status, body = self.request(
+            "/api/future-simulations",
+            method="POST",
+            body={
+                "symbol": "NABIL",
+                "action": "buy",
+                "shares": 10,
+                "entry_price": 574,
+                "days": [4, 10],
+                "iterations": 50,
+                "seed": 7,
+            },
+        )
+        self.assertEqual(status, 201)
+        self.assertEqual(
+            [h["due_date"] for h in body["horizons"]], ["2026-11-24", "2026-11-30"]
+        )
+        self.assertTrue(Path(body["simulation_dir"], body["id"] + ".json").is_file())
+
+        self.__class__.today = date(2026, 11, 30)
+        status, settled = self.request("/api/future-simulations/" + body["id"])
+        self.assertEqual(status, 200)
+        self.assertEqual([h["status"] for h in settled["horizons"]], ["settled", "settled"])
+        self.assertEqual(settled["status"], "settled")
+
+        status, listing = self.request("/api/future-simulations")
+        self.assertEqual(status, 200)
+        self.assertTrue(any(row["id"] == body["id"] for row in listing["simulations"]))
+
+    def test_invalid_horizon_is_400(self):
+        status, error = self.request(
+            "/api/future-simulations",
+            method="POST",
+            body={"symbol": "NABIL", "shares": 1, "price": 10, "days": [0]},
+        )
+        self.assertEqual(status, 400)
+        self.assertIn("error", error)
 
 
 if __name__ == "__main__":

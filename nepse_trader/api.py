@@ -31,6 +31,7 @@ from . import db as db_mod
 from . import plan as plan_mod
 from . import runs as runs_mod
 from . import scan as scan_mod
+from . import future_simulations as future_mod
 from . import simulation as simulation_mod
 from . import store
 from . import timemachine as tm_mod
@@ -364,6 +365,115 @@ class App:
                 continue
         return {"simulations": rows, "directory": str(self._simulation_dir())}
 
+    def _future_dir(self):
+        directory = Path(self.cfg.get("state_dir") or "trader") / "future_simulations"
+        directory.mkdir(parents=True, exist_ok=True)
+        return directory
+
+    def _future_path(self, simulation_id):
+        return self._future_dir() / (simulation_id + ".json")
+
+    def create_future_simulation(self, request):
+        symbol = str(request.get("symbol") or "").strip().upper()
+        if not re.fullmatch(r"[A-Z0-9&_.-]{1,24}", symbol):
+            raise ApiError("symbol is required and must contain only letters, numbers, &, _, ., or -", 400)
+        action = str(request.get("action") or "buy").strip().lower()
+        if action not in ("buy", "sell"):
+            raise ApiError("action must be buy or sell", 400)
+        shares = request.get("shares")
+        if isinstance(shares, bool):
+            raise ApiError("shares must be an integer", 400)
+        try:
+            shares = int(shares)
+        except (TypeError, ValueError):
+            raise ApiError("shares must be an integer", 400)
+        if not (1 <= shares <= 10000000):
+            raise ApiError("shares must be between 1 and 10000000", 400)
+        price = request.get("price")
+        if price is None:
+            price = request.get("entry_price")
+        if price is None:
+            price = request.get("sell_price")
+        if isinstance(price, bool):
+            raise ApiError("price must be a number", 400)
+        try:
+            price = float(price)
+        except (TypeError, ValueError):
+            raise ApiError("price must be a number", 400)
+        if price <= 0:
+            raise ApiError("price must be positive", 400)
+        try:
+            days = future_mod.normalise_days(request.get("days", [4]))
+            iterations = int(request.get("iterations", 1000))
+            seed = request.get("seed")
+            seed = None if seed is None else int(seed)
+        except ValueError as exc:
+            raise ApiError(str(exc), 400)
+        if not (1 <= iterations <= MAX_ITERATIONS):
+            raise ApiError("iterations must be between 1 and %d" % MAX_ITERATIONS, 400)
+        with self.lock:
+            bars = self.source.bars(symbol, refresh=bool(request.get("refresh", False)))
+            payload = future_mod.new_record(
+                symbol, action, shares, price, days, self.cfg, bars,
+                iterations=iterations, seed=seed,
+            )
+        simulation_id = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ") + "-" + uuid.uuid4().hex[:8]
+        payload["id"] = simulation_id
+        payload["cache_dir"] = self.cfg["data"].get("cache_dir") or ""
+        if store.backend() == "postgres":
+            payload["simulation_dir"] = ""
+            return store.save_future_simulation(payload)
+        payload["simulation_dir"] = str(self._future_dir())
+        self._future_path(simulation_id).write_text(
+            json.dumps(payload, indent=2), encoding="utf-8"
+        )
+        return payload
+
+    def get_future_simulation(self, simulation_id, refresh=False):
+        if not re.fullmatch(r"[A-Za-z0-9T_-]{1,80}", simulation_id):
+            raise ApiError("bad simulation id", 400)
+        if store.backend() == "postgres":
+            payload = store.get_future_simulation(simulation_id)
+            if payload is None:
+                raise ApiError("simulation not found", 404)
+        else:
+            path = self._future_path(simulation_id)
+            if not path.is_file():
+                raise ApiError("simulation not found", 404)
+            payload = json.loads(path.read_text(encoding="utf-8"))
+        with self.lock:
+            bars = self.source.bars(payload["symbol"], refresh=refresh)
+            updated = future_mod.settle(payload, bars)
+        if store.backend() == "postgres":
+            return store.save_future_simulation(updated)
+        self._future_path(simulation_id).write_text(
+            json.dumps(updated, indent=2), encoding="utf-8"
+        )
+        return updated
+
+    def future_simulations(self):
+        if store.backend() == "postgres":
+            return {"simulations": store.list_future_simulations(), "directory": ""}
+        rows = []
+        for path in sorted(self._future_dir().glob("*.json"), reverse=True):
+            try:
+                item = json.loads(path.read_text(encoding="utf-8"))
+                rows.append(
+                    {
+                        "id": item.get("id"),
+                        "symbol": item.get("symbol"),
+                        "action": item.get("action"),
+                        "shares": item.get("shares"),
+                        "price": item.get("price"),
+                        "created_date": item.get("created_date"),
+                        "status": item.get("status"),
+                        "generated_at": item.get("generated_at"),
+                    }
+                )
+            except (OSError, ValueError):
+                continue
+        return {"simulations": rows, "directory": str(self._future_dir())}
+
 
 class Handler(BaseHTTPRequestHandler):
     server_version = "nepse-trader-api/1.0"
@@ -487,6 +597,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self._error(str(exc), 503)
             except Exception as exc:
                 return self._error("watchlist update failed: %s" % exc, 500)
+        if route == "/api/future-simulations":
+            try:
+                request = self._json_body()
+                return self._send(self.app.create_future_simulation(request), 201)
+            except ApiError as exc:
+                return self._error(str(exc), exc.status)
+            except data_mod.DataError as exc:
+                return self._error(str(exc), 404)
+            except Exception as exc:
+                return self._error("future simulation failed: %s" % exc, 500)
         if route == "/api/simulations":
             try:
                 length = int(self.headers.get("Content-Length", "0"))
@@ -507,7 +627,7 @@ class Handler(BaseHTTPRequestHandler):
         if route != "/api/alerts/check":
             return self._error(
                 "POST is only supported on /api/suggestions, /api/watchlist, "
-                "/api/alerts/check and /api/simulations",
+                "/api/alerts/check, /api/simulations and /api/future-simulations",
                 405,
             )
         try:
@@ -552,6 +672,9 @@ class Handler(BaseHTTPRequestHandler):
                             "POST /api/simulations": "custom paper-trade forecast (JSON body)",
                             "GET /api/simulations": "saved custom simulations",
                             "GET /api/simulations/{id}": "saved custom simulation result",
+                            "POST /api/future-simulations": "log a paper trade with future horizons",
+                            "GET /api/future-simulations": "saved future simulations",
+                            "GET /api/future-simulations/{id}": "settled future simulation",
                             "POST /api/alerts/check": "evaluate alerts against the latest quote",
                             "POST /api/suggestions": "BUY/SELL/HOLD run (Bearer CRON_SECRET; JSON body)",
                             "GET /api/suggestions/latest": "latest persisted suggestion run",
@@ -580,6 +703,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send({"alerts": alerts_mod.load(alerts_mod.path_for(app.cfg))})
             if path == "/api/simulations":
                 return self._send(app.simulations())
+            if path == "/api/future-simulations":
+                return self._send(app.future_simulations())
             if path == "/api/watchlist":
                 return self._send(
                     {"name": store.DEFAULT_WATCHLIST, "symbols": runs_mod.watchlist()}
@@ -610,6 +735,10 @@ class Handler(BaseHTTPRequestHandler):
             parts = [p for p in path.split("/") if p]
             if len(parts) == 3 and parts[0] == "api" and parts[1] == "simulations":
                 return self._send(app.get_simulation(parts[2]))
+            if len(parts) == 3 and parts[0] == "api" and parts[1] == "future-simulations":
+                return self._send(
+                    app.get_future_simulation(parts[2], refresh=_flag(query, "refresh"))
+                )
             if (
                 len(parts) == 3
                 and parts[0] == "api"
