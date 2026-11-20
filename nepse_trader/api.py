@@ -2,6 +2,10 @@
 
     python -m nepse_trader.api --config config.json --port 8000
 
+Hosts that inject a port (Render, Railway, Fly) are honoured automatically:
+when $PORT is set the server binds 0.0.0.0 on it, so a start command of just
+`python -m nepse_trader.api --config config.json` works there.
+
 Everything the CLI computes is returned as JSON: the year of cached daily bars,
 fired setups, the plan, sizing, the risk verdict and the Time Machine odds.
 NEPSE data access is serialized behind one lock because the official client
@@ -829,17 +833,51 @@ def build_server(cfg, host="127.0.0.1", port=8000):
     return ThreadingHTTPServer((host, int(port)), handler)
 
 
+def _port_from_env():
+    """The port injected by hosts such as Render, or None when unset/invalid."""
+    raw = os.environ.get("PORT", "").strip()
+    if not raw:
+        return None
+    try:
+        port = int(raw)
+    except ValueError:
+        print("nepse-trader API: ignoring invalid PORT=%r" % raw)
+        return None
+    if port <= 0:
+        print("nepse-trader API: ignoring PORT=%r" % raw)
+        return None
+    return port
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(prog="nepse-trader-api", description=__doc__)
     parser.add_argument("--config", default=None)
-    parser.add_argument("--host", default="127.0.0.1")
-    parser.add_argument("--port", type=int, default=8000)
+    parser.add_argument(
+        "--host",
+        default=None,
+        help="bind address (default $HOST, else 0.0.0.0 when $PORT is set, else 127.0.0.1)",
+    )
+    parser.add_argument(
+        "--port",
+        type=int,
+        default=None,
+        help="bind port (default $PORT when set, else 8000)",
+    )
     args = parser.parse_args(argv)
+    # Render (and most PaaS hosts) route traffic to $PORT and only scan 0.0.0.0,
+    # so the injected values win over the local defaults.
+    env_port = _port_from_env()
+    port = env_port if env_port is not None else (args.port if args.port is not None else 8000)
+    host = args.host or os.environ.get("HOST", "").strip() or (
+        "0.0.0.0" if env_port is not None else "127.0.0.1"
+    )
+    if env_port is not None and args.port is not None and args.port != env_port:
+        print("nepse-trader API: using PORT=%d from the environment, not --port %d" % (env_port, args.port))
     cfg = config_mod.load(args.config)
-    server = build_server(cfg, args.host, args.port)
+    server = build_server(cfg, host, port)
     print(
         "nepse-trader API on http://%s:%d  (config %s, data %s)"
-        % (args.host, args.port, args.config or "defaults", cfg["data"].get("kind"))
+        % (host, port, args.config or "defaults", cfg["data"].get("kind"))
     )
     try:
         server.serve_forever()

@@ -1,0 +1,32 @@
+{
+  "symbol": "DOLTI",
+  "action": "buy",
+  "shares": 10,
+  "price": 327.0,
+  "created_date": "2026-11-20",
+  "charges": {
+    "broker_pct": 0.36,
+    "sebon_pct": 0.015,
+    "dp_charge": 25.0
+  },
+  "horizons": [
+    {
+      "days": 4,
+      "due_date": "2026-11-24",
+      "forecast_sessions": 2,
+      "status": "pending",
+      "forecast": {
+        "expected_net_pnl": -90.29,
+        "best_net_pnl": 325.11,
+        "worst_net_pnl": -411.46,
+        "profit_probability_pct": 11.9
+      }
+    }
+  ],
+  "status": "pending",
+  "generated_at": "2026-11-20T12:27:37Z",
+  "caveat": "Forecast only until settled; it bootstraps the trading sessions between creation and the calendar-day due date. The settled result uses the close on the stored due date and the charges in the saved record. It is not a broker order or a prediction.",
+  "id": "20261120T122737Z-00d8ff15",
+  "cache_dir": "data/cache",
+  "simulation_dir": "trader\\future_simulations"
+}

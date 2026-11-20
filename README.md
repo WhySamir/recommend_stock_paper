@@ -180,6 +180,15 @@ flattering.
 python -m nepse_trader.api --config config.json --host 127.0.0.1 --port 8000
 ```
 
+When the host injects a port (Render, Railway, Fly, Heroku), `$PORT` wins over
+`--port` and the server binds `0.0.0.0`, so the start command there is just:
+
+```bash
+python -m nepse_trader.api --config config.json
+```
+
+`$HOST` overrides the bind address if you ever need a fixed one.
+
 Standard library only, threaded, with CORS restricted by default to
 `http://localhost:3000` plus the origin in the `FRONTEND_CORS_ORIGIN`
 environment variable. Configure additional local origins with
